@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESPIRA-X - ML Demo</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .status-icon {
+            margin-left: 8px;
+            font-size: 20px;
+            display: none;
+        }
+
+        .recording .status-icon.mic {
+            display: inline-block;
+            color: #f44336;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .completed .status-icon.tick {
+            display: inline-block;
+            color: #4caf50;
+        }
+
+        .record-btn.recording {
+            background-color: #ff4444;
+        }
+
+        .record-btn.completed {
+            background-color: #44ff44;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>RESPIRA-X</h1>
+            <p>Educational AI/ML Cough Pattern Analysis</p>
+        </header>
+
+        <div class="recorder">
+            <button id="recordBtn" class="record-btn">
+                Record Cough (3s)
+                <span id="recordStatus" class="status-icon"></span>
+            </button>
+            <input type="file" id="audioInput" accept="audio/*" capture="user" style="display:none;">
+            <label for="audioInput" class="file-upload">Upload Audio</label>
+            <button id="analyzeBtn" class="analyze-btn" disabled>Analyze</button>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Analyzing cough pattern...</p>
+        </div>
+
+        <div id="result" class="result hidden"></div>
+
+        <footer>
+            <p><strong>Disclaimer:</strong> Educational ML demo only. Not for medical diagnosis.</p>
+        </footer>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+
+</html>
