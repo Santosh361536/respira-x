@@ -10,8 +10,11 @@ app = FastAPI()
 directories = ["static", "templates", "dist/assets"]
 for d in directories:
     if not os.path.exists(d):
-        print(f"⚠️ Warning: Directory '{d}' not found. Creating it...")
-        os.makedirs(d, exist_ok=True)
+        print(f"⚠️ Warning: Directory '{d}' not found. Attempting to create it...")
+        try:
+            os.makedirs(d, exist_ok=True)
+        except OSError:
+            print(f"⚠️ Warning: Read-only filesystem, skipping creation for '{d}'.")
 
 # Mount filesystems
 if os.path.exists("dist/assets"):
@@ -30,11 +33,13 @@ else:
 
 # DEBUG: Check model
 import joblib
-model_exists = os.path.exists("cough_model.joblib")
-print(f"🚨 MODEL EXISTS: {model_exists}")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "cough_model.joblib")
+model_exists = os.path.exists(MODEL_PATH)
+print(f"🚨 MODEL EXISTS: {model_exists} at {MODEL_PATH}")
 if model_exists:
     try:
-        model = joblib.load("cough_model.joblib")
+        model = joblib.load(MODEL_PATH)
         print("🚨 MODEL LOADED SUCCESSFULLY")
     except Exception as e:
         print(f"🚨 MODEL LOAD FAILED: {e}")
