@@ -1,52 +1,60 @@
 import sys
 import os
+import glob
+import io
 import soundfile as sf
 import librosa
-import io
-# Find a test file in the dataset if the hardcoded one is missing
-import glob
-DATASET_PATH = "/Users/tadisaisantosh/Downloads/dataset_1sec"
-path = "/Users/tadisaisantosh/Downloads/dataset_1sec/covid/5131b118-88df-4d26-90bb-85b726fe0b5a_1.wav"
 
-if not os.path.exists(path):
-    print(f"⚠️ Hardcoded path {path} not found. Searching in {DATASET_PATH}...")
-    found_files = glob.glob(os.path.join(DATASET_PATH, "**/*.wav"), recursive=True)
-    if found_files:
-        path = found_files[0]
-        print(f"✅ Found alternative file: {path}")
-    else:
-        # Final fallback to test.wav in current dir
-        path = "test.wav"
-        print(f"⚠️ No files found in dataset. Falling back to: {path}")
+# Dynamically locate project root and dataset directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATASET_PATH = os.path.join(BASE_DIR, "dataset_1sec")
+FALLBACK_FILE = os.path.join(BASE_DIR, "test.wav")
 
-print("Testing soundfile...")
+# Find a test file dynamically
+found_files = glob.glob(os.path.join(DATASET_PATH, "**/*.wav"), recursive=True)
+
+if found_files:
+    path = found_files[0]
+    print(f"✅ Found sample audio file in dataset: {path}")
+elif os.path.exists(FALLBACK_FILE):
+    path = FALLBACK_FILE
+    print(f"⚠️ No files found in dataset. Falling back to root sample: {path}")
+else:
+    print(f"❌ Error: Neither dataset files in '{DATASET_PATH}' nor '{FALLBACK_FILE}' were found.")
+    sys.exit(1)
+
+print("\n--- 1. Testing soundfile ---")
 try:
-    data, sr = sf.read(path)
-    print("✅ soundfile success")
+    data, sr = sf.read(path, dtype='float32')
+    print(f"✅ soundfile success (Sample Rate: {sr}, Shape: {data.shape})")
 except Exception as e:
     print(f"❌ soundfile failed: {e}")
 
-print("Testing librosa...")
+print("\n--- 2. Testing librosa ---")
 try:
-    data, sr = librosa.load(path)
-    print("✅ librosa success")
+    data, sr = librosa.load(path, sr=22050)
+    print(f"✅ librosa success (Sample Rate: {sr}, Shape: {data.shape})")
 except Exception as e:
     print(f"❌ librosa failed: {e}")
 
-print("\n=== BYTESIO TEST ===")
+print("\n--- 3. Testing BytesIO Stream ---")
 try:
     with open(path, 'rb') as f:
         audio_bytes = f.read()
-    
+
     print("Testing soundfile BytesIO...")
     try:
-        data, sr = sf.read(io.BytesIO(audio_bytes))
+        data, sr = sf.read(io.BytesIO(audio_bytes), dtype='float32')
         print("✅ soundfile BytesIO success")
-    except:
-        print("❌ soundfile BytesIO failed (expected for some formats)")
-    
+    except Exception as e:
+        print(f"❌ soundfile BytesIO failed: {e}")
+
     print("Testing librosa BytesIO...")
-    data, sr = librosa.load(io.BytesIO(audio_bytes))
-    print("✅ librosa BytesIO success")
+    try:
+        data, sr = librosa.load(io.BytesIO(audio_bytes), sr=22050)
+        print("✅ librosa BytesIO success")
+    except Exception as e:
+        print(f"❌ librosa BytesIO failed: {e}")
+
 except Exception as e:
-    print(f"Test failed: {e}")
+    print(f"BytesIO stream test failed: {e}")
