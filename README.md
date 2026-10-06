@@ -1,32 +1,21 @@
-# respira-x
+# Respira-X 🫁
 
-Breathe intelligence into respiratory health. Our platform uses deep learning and Convolutional Neural Networks to provide instant, accurate analysis of cough patterns.
+> **Breathe intelligence into respiratory health.**  
+> Respira-X is an acoustic screening platform that extracts clinical biomarkers and spectral signatures from cough recordings to deliver immediate, non-invasive respiratory pattern analysis.
 
-## Technologies Used
+---
 
-This project is built with:
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-- Python / FastAPI
-- Random Forest Model (scikit-learn)
+## 📌 Project Overview
 
-## Getting Started
+Respira-X provides an accessible, pre-diagnostic evaluation of respiratory acoustic signals. By capturing a single-burst cough through standard consumer audio hardware, the system eliminates background silence, calculates acoustic features (MFCCs, spectral roll-off, centroid, flux, RMS energy, and pitch), and classifies the input against verified clinical patterns.
 
-### 1. Frontend Setup
-Make sure you have Node.js installed, then run:
+### Supported Diagnostic Classes
+* **Normal / Throat Clearing** (`healthy`)
+* **COVID-19 Positive Pattern** (`covid`)
+* **Bronchial Obstruction / Asthma / Bronchitis** (`obstructive`)
+* **Respiratory Tract Infection** (`upper` / `lower`)
+* **False Signal Rejection** (`talking` / `noise` / duration anomaly)
 
-```sh
-npm install
-npm run dev
-```
+---
 
-### 2. Backend Setup
-Make sure you have Python installed, then run:
-
-```sh
-pip install -r requirements.txt
-python app.py
-```
+## 🛠️ System Architecture & Tech Stack
