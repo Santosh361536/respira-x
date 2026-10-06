@@ -13,7 +13,6 @@ from fastapi.templating import Jinja2Templates
 
 app = FastAPI(title="Respira-X API")
 
-# Resolve absolute root directory of this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -22,11 +21,9 @@ DIST_ASSETS_DIR = os.path.join(DIST_DIR, "assets")
 DIST_INDEX = os.path.join(DIST_DIR, "index.html")
 MODEL_PATH = os.path.join(BASE_DIR, "cough_model.joblib")
 
-# Ensure required directories exist
 for folder in [STATIC_DIR, TEMPLATES_DIR]:
     os.makedirs(folder, exist_ok=True)
 
-# Mount static asset folders
 if os.path.exists(DIST_ASSETS_DIR):
     app.mount("/assets", StaticFiles(directory=DIST_ASSETS_DIR), name="assets")
 
@@ -35,7 +32,6 @@ if os.path.exists(STATIC_DIR):
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR) if os.path.exists(TEMPLATES_DIR) else None
 
-# Load model artifact
 model = None
 if os.path.exists(MODEL_PATH):
     try:
@@ -57,7 +53,7 @@ async def home(request: Request):
         return response
     if templates and os.path.exists(os.path.join(TEMPLATES_DIR, "index.html")):
         return templates.TemplateResponse("index.html", {"request": request})
-    return HTMLResponse("<h1>Respira-X API Running</h1><p>Run <code>bun run build</code> or <code>npm run build</code> to serve the frontend.</p>")
+    return HTMLResponse("<h1>Respira-X API Running</h1><p>Run <code>npm run build</code> to compile frontend assets.</p>")
 
 
 @app.post("/analyze")
@@ -69,15 +65,14 @@ async def analyze(cough_audio: UploadFile = File(...)):
             "status": "Analysis Failed",
             "prediction": "ERROR ❌",
             "confidence": "N/A%",
-            "details": "Model not loaded on server. Run train_model.py first.",
+            "details": "Model pipeline not loaded on server. Run train_model.py first.",
             "severity": "high",
         }
 
-    # Step 1: Read audio buffer
     try:
         audio_bytes = await cough_audio.read()
         if len(audio_bytes) == 0:
-            raise ValueError("Uploaded file is empty.")
+            raise ValueError("Uploaded audio file is empty.")
     except Exception as e:
         return {
             "status": "Analysis Failed",
@@ -87,13 +82,10 @@ async def analyze(cough_audio: UploadFile = File(...)):
             "severity": "high",
         }
 
-    # Step 2: Load audio data safely
     try:
         try:
-            # First attempt: direct memory stream via librosa
             audio_data, sr = librosa.load(io.BytesIO(audio_bytes), sr=22050)
         except Exception:
-            # Fallback: write to temp file for soundfile / ffmpeg codec resolution
             suffix = os.path.splitext(cough_audio.filename or ".wav")[-1] or ".wav"
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(audio_bytes)
@@ -105,64 +97,88 @@ async def analyze(cough_audio: UploadFile = File(...)):
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
 
-        # Trim silence
-        trimmed_audio, _ = librosa.effects.trim(audio_data, top_db=20)
-        duration = librosa.get_duration(y=trimmed_audio, sr=sr)
-
-        # Rejection: continuous sound / speech check
-        if duration > 1.6:
+        trimmed_audio, _ = librosa.effects.trim(audio_data, top_db=22)
+        if len(trimmed_audio) == 0:
             return {
                 "status": "Analysis Complete",
-                "prediction": "NOT A COUGH / UNCLEAR",
-                "confidence": "N/A",
-                "details": f"Recording duration ({duration:.2f}s) exceeded single-cough window. Please record a brief single cough.",
+                "prediction": "SILENCE / NO SIGNAL",
+                "confidence": "100%",
+                "details": "Audio recording contains no audible cough signature. Please try again.",
                 "severity": "low",
             }
 
-        # Step 3: Feature extraction
+        duration = librosa.get_duration(y=trimmed_audio, sr=sr)
+        print(f"📊 Active audio duration after trimming: {duration:.2f}s")
+
+        if duration > 1.25:
+            return {
+                "status": "Analysis Complete",
+                "prediction": "SPEECH / PROLONGED SOUND",
+                "confidence": "N/A",
+                "details": f"Recording duration ({duration:.2f}s) exceeded a single cough burst. Please record an isolated, single cough.",
+                "severity": "low",
+            }
+
+        if duration < 0.15:
+            return {
+                "status": "Analysis Complete",
+                "prediction": "SIGNAL TOO SHORT",
+                "confidence": "N/A",
+                "details": "Audio snippet was too brief to extract clinical markers.",
+                "severity": "low",
+            }
+
         from train_model import extract_features_from_array
         features = extract_features_from_array(trimmed_audio, sr)
 
         if features is None:
-            raise ValueError("Feature extraction failed.")
+            raise ValueError("Feature vector formulation failed.")
 
         probabilities = model.predict_proba([features])[0]
         ml_prediction = model.predict([features])[0]
         confidence = float(np.max(probabilities) * 100)
 
-        # False positive dampening
-        if ml_prediction in ["upper", "lower", "obstructive", "covid"] and confidence < 70.0:
-            ml_prediction = "healthy"
-            confidence = 80.0
+        classes_debug = dict(zip(model.classes_, [f"{p*100:.1f}%" for p in probabilities]))
+        print(f"🎯 Prediction: {ml_prediction} ({confidence:.1f}%) | Probabilities: {classes_debug}")
 
-        # UI mappings
+        if ml_prediction in ["talking", "noise"]:
+            return {
+                "status": "Analysis Complete",
+                "prediction": "NOT A COUGH",
+                "confidence": f"{confidence:.1f}%",
+                "details": f"Sound identified as human speech or background ambient noise ({ml_prediction}). Please submit an isolated cough sound.",
+                "severity": "low",
+            }
+
+        if confidence < 45.0:
+            return {
+                "status": "Analysis Complete",
+                "prediction": "INCONCLUSIVE / UNCLEAR",
+                "confidence": f"{confidence:.1f}%",
+                "details": "Acoustic signature could not be matched with high certainty. Try recording closer to the microphone.",
+                "severity": "low",
+            }
+
         if ml_prediction == "covid":
-            prediction = "COVID POSITIVE SUSPECTED"
+            prediction = "COVID-19 PATTERN DETECTED"
             severity = "high"
-            details = f"Detected acoustic features associated with COVID-19 patterns ({duration:.2f}s). Consult a healthcare professional."
+            details = f"Acoustic features display signatures consistent with COVID-19 pulmonary patterns ({duration:.2f}s). Seek clinical confirmation."
         elif ml_prediction == "healthy":
             prediction = "NORMAL"
             severity = "low"
-            details = f"No significant abnormal respiratory signatures detected ({duration:.2f}s)."
+            details = f"No abnormal respiratory signatures detected ({duration:.2f}s). Sounds consistent with a clear throat or healthy cough."
         elif ml_prediction in ["upper", "lower"]:
             prediction = "RESPIRATORY TRACT INFECTION"
             severity = "medium"
-            details = f"Detected acoustic markers consistent with an upper/lower respiratory infection ({duration:.2f}s)."
+            details = f"Detected spectral characteristics indicative of respiratory tract inflammation ({duration:.2f}s)."
         elif ml_prediction == "obstructive":
             prediction = "BRONCHIAL OBSTRUCTION"
             severity = "medium"
-            details = f"Detected signs of obstructive respiratory distress ({duration:.2f}s)."
-        elif ml_prediction in ["talking", "noise"]:
-            prediction = "NOT A COUGH"
-            severity = "low"
-            details = f"Audio identified as ambient noise or speech ({ml_prediction})."
+            details = f"Acoustic markers show airflow resistance consistent with bronchitis/asthmatic cough ({duration:.2f}s)."
         else:
             prediction = str(ml_prediction).upper()
             severity = "low"
             details = f"Classification: {ml_prediction}."
-
-        if duration > 1.2:
-            details += " (Tip: Record a single isolated cough for higher clarity.)"
 
         return {
             "status": "Analysis Complete",
