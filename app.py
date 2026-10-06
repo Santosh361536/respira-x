@@ -57,14 +57,15 @@ else:
 @app.get("/")
 async def home(request: Request):
     if os.path.exists(DIST_INDEX):
-        response = FileResponse(DIST_INDEX)
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-        return response
-    if templates and os.path.exists(os.path.join(TEMPLATES_DIR, "index.html")):
-        return templates.TemplateResponse("index.html", {"request": request})
-    return HTMLResponse("<h1>Respira-X API Running</h1><p>Run <code>npm run build</code> to compile frontend assets.</p>")
+        return FileResponse(DIST_INDEX)
+    return JSONResponse({
+        "status": "online",
+        "service": "Respira-X Audio Analysis API",
+        "version": "1.0.0",
+        "endpoints": {
+            "analyze": "POST /analyze (multipart/form-data: cough_audio)"
+        }
+    })
 
 
 @app.post("/analyze")
