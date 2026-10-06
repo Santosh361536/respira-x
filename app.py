@@ -56,17 +56,7 @@ else:
 
 @app.get("/")
 async def home(request: Request):
-    if os.path.exists(DIST_INDEX):
-        return FileResponse(DIST_INDEX)
-    return JSONResponse({
-        "status": "online",
-        "service": "Respira-X Audio Analysis API",
-        "version": "1.0.0",
-        "endpoints": {
-            "analyze": "POST /analyze (multipart/form-data: cough_audio)"
-        }
-    })
-
+    return JSONResponse({"status": "online", "service": "Respira-X API"})
 
 @app.post("/analyze")
 async def analyze(cough_audio: UploadFile = File(...)):
