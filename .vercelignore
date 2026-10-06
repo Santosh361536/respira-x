@@ -1,0 +1,14 @@
+app.py
+train_model.py
+test_audio.py
+cough_model.joblib
+dataset_1sec/
+requirements.txt
+render-build.sh
+.python-version
+__pycache__/
+*.pyc
+*.wav
+*.mp3
+.venv/
+venv/

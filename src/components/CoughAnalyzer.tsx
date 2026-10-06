@@ -226,7 +226,7 @@ export default function CoughAnalyzer() {
             const formData = new FormData();
             formData.append('cough_audio', wavBlob, 'cough.wav');
 
-            const response = await fetch('/analyze', {
+            const response = await fetch((import.meta.env.VITE_API_URL || 'https://respira-x.onrender.com') + '/analyze', {
                 method: 'POST',
                 body: formData,
             });
